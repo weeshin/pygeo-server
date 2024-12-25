@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from wms.router import router as wms_router
+from app.wms.router import router as wms_router
 
 app = FastAPI(title="FastAPI WMS Server")
 
