@@ -1,7 +1,7 @@
 import rasterio
 
 # Open the COG file
-cog_file_path = "D:\\Merbau Pulas\\merbau_pulas_compressed.tif"
+cog_file_path = "D:\EmDrone\Lahad Datu\lahad_datu_cog.tif"
 
 with rasterio.open(cog_file_path) as dataset:
     # Print metadata
@@ -18,3 +18,7 @@ with rasterio.open(cog_file_path) as dataset:
 
     # Access coordinate reference system (CRS)
     print("CRS:", dataset.crs)
+
+    # Read band
+    band1 = dataset.read(1)
+    print(band1)

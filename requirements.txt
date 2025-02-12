@@ -10,3 +10,4 @@ pydantic-settings==2.3.4
 sqlalchemy==2.0.31
 alembic==1.13.2
 rio-cogeo==5.4.1
+rio-tiler==7.4.0

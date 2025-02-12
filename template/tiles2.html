@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />  
+</head>
+<body>
+  <div id="map" style="height: 500px;"></div>
+  <script src="https://unpkg.com/proj4@2.9.1/dist/proj4.js"></script>
+  <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script>
+    
+    const map = L.map('map', {
+          // center: [2.752678, 102.767654],
+          center: [2.840142,102.850811],
+          zoom: 14,
+          maxZoom: 24
+        }); // Adjust coordinates and zoom level as needed
+
+    L.tileLayer('http://localhost:8000/api/tiles?z={z}&x={x}&y={y}', {
+      tms: true,
+      zoom: 14,  
+      minZoom: 14,    
+      maxZoom: 23,
+      attribution: 'Generated with Rasterio'
+    }).addTo(map);
+  </script>
+</body>
+</html>

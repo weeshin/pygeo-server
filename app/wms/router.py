@@ -22,20 +22,20 @@ async def wms(
     bbox: str = Query(None, description="Bounding box (minx,miny,maxx,maxy)"),
     width: int = Query(None, description="Map width in pixels"),
     height: int = Query(None, description="Map height in pixels"),
-    srs: str = Query("EPSG:4326", description="Coordinate Reference System"),
+    crs: str = Query("EPSG:4326", description="Coordinate Reference System"),
     format: str = Query("image/png", description="Output format"),
     db: Session = Depends(database.get_db)
 ):
-    log.debug(f"Version {version}, bbox {bbox}, srs {srs}")
+    log.debug(f"Version {version}, bbox {bbox}, csr {crs}")
     match version:
         case "1.1.0":
             log.debug("1.1.0")            
         case "1.1.1":
-            print("1.1.1")
+            log.debug("1.1.1")
         case "1.3.0":
-            print("1.3.0")
+            log.debug("1.3.0")
         case _:
-            print ("default")
+            log.debug ("default")
 
     # Processing request to Support 'GetCapabilities', 'GetMap' and 'GetFeatureInfo    
     if request.lower() == "getcapabilities":
@@ -52,13 +52,18 @@ async def wms(
             case "1.1.0":
                 log.debug("1.1.0")            
             case "1.1.1":
-                content = GetMap_111(geotiff_path="D:\EmDrone\Lahad Datu\lahad_datu_cog.tif", bbox=bbox, width=width, height=height, crs=srs)
+                content = GetMap_111(geotiff_path="./data/lahad_datu_cog.tif", bbox=bbox, width=width, height=height, crs=crs)
             case "1.3.0":
-                content = GetMap_130(geotiff_path="D:\EmDrone\Lahad Datu\lahad_datu_cog.tif", bbox=bbox, width=width, height=height, crs=srs)
+                content = GetMap_130(geotiff_path="./data/lahad_datu_cog.tif", bbox=bbox, width=width, height=height, crs=crs)
+                # log.debug(f"content {content}");
             case _:
-                print ("default")
+                print ("default")    
+
+        return Response(
+            content=content,
+            media_type=format
+        )
         
-        return Response(content=content, media_type=format)
     
     return Response(content="<error>Unsupported request type</error>", media_type="application/xml")
 

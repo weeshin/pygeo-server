@@ -1,75 +1,89 @@
+import logging
 import rasterio
-from rasterio.enums import Resampling
-from rasterio.transform import Affine
 from rasterio.windows import from_bounds
 from rio_cogeo.cogeo import cog_validate
+from pyproj import Transformer
+from rasterio.enums import Resampling
 from rasterio.io import MemoryFile
 
+
+log = logging.getLogger(__name__)
+
 class WMSBaseServiceHandle:
+
+
     def GetMap(geotiff_path, bbox, width, height, crs, format="image/png"):
-        """
-        Generate a WMS GetMap response from a GeoTIFF.
+        log.info(f"CRS {crs}, GeoTiff {geotiff_path}")
 
-        Args:
-            geotiff_path (str): Path to the GeoTIFF file.
-            bbox (tuple): Bounding box (minx, miny, maxx, maxy) in the requested CRS.
-            width (int): Width of the output image.
-            height (int): Height of the output image.
-            crs (str): Requested CRS (e.g., "EPSG:4326").
-            format (str): Output format (e.g., "image/png").
-
-        Returns:
-            bytes: The generated image bytes.
-        """
-        # TODO: Validate CRS
-        
+        bbox = tuple(map(float, bbox.split(",")))  # Convert string to tuple of floats        
 
         # Validate if the GeoTIFF is a valid COG
-        if not cog_validate(geotiff_path):
-            raise ValueError("The provided GeoTIFF is not a valid Cloud Optimized GeoTIFF.")
+        try:
+            cog_validate(geotiff_path)
+        except Exception as e:
+            raise ValueError(f"The provided GeoTIFF is not a valid Cloud Optimized GeoTIFF: {e}")
 
+        log.debug(f"RasterIO Open {geotiff_path}")
         with rasterio.open(geotiff_path) as src:
-            # Convert bounding box to the GeoTIFF CRS
-            if not src.transform or src.transform == Affine.identity():
-                print("No geotransform found. Using default transform.")
-                transform = Affine.translation(0, 0) * Affine.scale(1, -1)  # Identity transform
-            else:
-                transform = src.transform
+            log.info(f"GeoTIFF CRS: {src.crs}, Bounds: {src.bounds}" )        
 
-            print(transform)
+            # GeoTIFF CRS
             src_crs = src.crs
+            src_bounds = src.bounds
 
-            print(src_crs)
-            
-            # Convert string to tuple of floats
-            bbox = tuple(map(float, bbox.split(",")))
-
+            # log.info(f"BBox {bbox}")
+            # log.info(f"crs {crs} , src_crs {src_crs}")            
             # Reproject bounding box if CRS differs
             if crs != str(src_crs):
-                from pyproj import Transformer
-                transformer = Transformer.from_crs(crs, src_crs, always_xy=True)
-                bbox = transformer.transform_bounds(*bbox)
-            
-            # Create a window for the requested bounding box
-            window = from_bounds(*bbox, transform=src.transform)
-            
-            # Read the raster data within the window
-            data = src.read(window=window, out_shape=(src.count, height, width))
-            print(data)
+                try: 
+                    transformer = Transformer.from_crs(crs, src_crs, always_xy=True)
+                    log.debug(f"Transformer {transformer}")
+                    minx, miny, maxx, maxy = bbox
+                    minx, miny = transformer.transform(minx, miny)
+                    maxx, maxy = transformer.transform(maxx, maxy)
+                    log.info(f"minx {minx}, miny {miny}")
+                    bbox = (minx, miny, maxx, maxy)                
+                    log.info(f"Reprojected BBox: {bbox}")                
+                except Exception as e:
+                    log.error(f"Error during reprojection: {e}")
+                    raise
 
-            # Normalize to 8-bit and convert to PNG
-            normalized_data = (data / data.max() * 255).astype("uint8")
-            print(normalized_data)
+            # Clip bbox to source bounds
+            minx = max(bbox[0], src_bounds.left)
+            miny = max(bbox[1], src_bounds.bottom)
+            maxx = min(bbox[2], src_bounds.right)
+            maxy = min(bbox[3], src_bounds.top)
+
+            if (minx, miny, maxx, maxy) != bbox:
+                log.warning(f"BBox adjusted to fit within source bounds: {(minx, miny, maxx, maxy)}")
+
+            # Compute window and validate
+            try:
+                window = from_bounds(*bbox, transform=src.transform)        
+            except Exception as e:
+                log.error(f"Error computing window: {e}")
+                raise ValueError("Bounding box is invalid.")
             
-            if format is "image/jpg":
-                driver = "JPG"
-            else:
-                driver = "PNG"
+            # Read data
+            data = src.read(
+                window=window, 
+                out_shape=(src.count, height, width), 
+                resampling=Resampling.bilinear
+            )
+
+            # Normalize to 8-bit
+            data_max = data.max()
+            if data_max == 0:
+                raise ValueError("Data contains only zeros.")
+            normalized_data = (data / data_max * 255).astype("uint8")
             
             # Write to PNG using Pillow
             with MemoryFile() as memfile:
-                with memfile.open(driver=driver, width=width, height=height, count=src.count, dtype="uint8") as dst:
+                with memfile.open(driver="PNG", width=width, height=height, count=src.count, dtype="uint8") as dst:
                     dst.write(normalized_data)
                 png_data = memfile.read()
                     
             return png_data
+        
+    
+    
