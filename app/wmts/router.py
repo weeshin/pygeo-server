@@ -21,4 +21,3 @@ async def wmts(
     return Response(content="WMTS", media_type="text/plain")
 
 
-@router.get("",)

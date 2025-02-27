@@ -2,44 +2,44 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 import sqlite3
 import os
+import logging
+import morecantile
+
+from rio_tiler.errors import TileOutsideBounds
+from rio_tiler.io import Reader
+from rio_tiler.profiles import img_profiles
 
 router = APIRouter()
 
-# Define the fixed database path
-DB_PATH = os.path.realpath(r"D:\\johor\\Segamat-bukit bujang\\mbtiles\\2b-tiles.mbtiles")
-DB_PATH = os.path.realpath(r"D:\\johor\\Segamat-bukit bujang\\mbtiles\\2b-tiles-12-22.mbtiles")
-DB_PATH = os.path.realpath(r"D:\\teeh-teh-mbtiles\\tee-teh-17-23-engine.mbtiles")
+# @router.get("/tiles/WebMercatorQuad/{z}/{x}/{y}")
+# def tiles(z: int, x: int, y: int):
+#     img = _get_tile(z=z, x=x, y=y, tms="WebMercatorQuad")
+#     return Response(content=img, media_type="image/png")
 
-@router.get("/tiles")
-def get_tile(z: int = Query(..., alias="z"),
-             x: int = Query(..., alias="x"),
-             y: int = Query(..., alias="y")):
-    
-    # Ensure the file exists
-    if not os.path.isfile(DB_PATH):
-        raise HTTPException(status_code=404, detail="Database not found or access denied.")
+@router.get("/tiles/{layerName}/{z}/{x}/{y}")
+def tiles(layerName: str, z: int, x: int, y: int):
+    img = _get_tile(z=z, x=x, y=y, tms="WebMercatorQuad", layerName=layerName)
+    return Response(content=img, media_type="image/png")
+
+url = "/app/data/lahad_datu_cog.tif"
+url = "/app/data/mersing-rgb.tiff"
+# url = "https://njogis-imagery.s3.amazonaws.com/2020/cog/I7D16.tif"
+def _get_tile(layerName, tms, z, x, y):
+    logging.info(f"Request for tile {z}/{x}/{y} for {layerName}")
+    if layerName == "lahad_datu":
+        url = "/app/data/lahad_datu_cog.tif"
+    elif layerName == "mersing":
+        url = "/app/data/mersing-rgb.tiff"
+    else:
+        raise HTTPException(status_code=401)
 
     try:
-        # Connect to the SQLite database
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
+        with Reader(url, tms=morecantile.tms.get(tms)) as cog:        
+            img = cog.tile(x, y, z, indexes=(1, 2, 3))
+    except TileOutsideBounds:
+        raise HTTPException(status_code=404)
 
-        # Query the tiles table
-        query = """
-        SELECT zoom_level, tile_column, tile_row, tile_data
-        FROM tiles
-        WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?
-        """
-        cursor.execute(query, (z, x, y))
-        result = cursor.fetchone()
+    prof = img_profiles.get("PNG", {})
+    return img.render(img_format="PNG", **prof)
 
-        if result:
-            zoom_level, tile_column, tile_row, tile_data = result
-            return Response(content=tile_data, media_type="image/png")
-        else:
-            raise HTTPException(status_code=404, detail="Tile not found.")
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-    finally:
-        if conn:
-            conn.close()
+

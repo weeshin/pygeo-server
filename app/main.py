@@ -27,7 +27,7 @@ app = FastAPI(
 )
 
 app.include_router(wms_router, prefix="/api")
-app.include_router(wmts_router)
+# app.include_router(wmts_router)
 app.include_router(mbtiles_router, prefix="/api")
 
 # Test root endpoint

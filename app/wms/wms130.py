@@ -119,8 +119,8 @@ def GetCapabilities(serviceModel: Service, db: Session):
 
 def GetMap(geotiff_path, bbox, width, height, crs, format="image/png"):
     log.info(f"bbox {bbox}")
-    # return WMSBaseServiceHandle.GetMap(geotiff_path, bbox, width, height, crs, format=format)
-    return WMSBaseServiceHandle2.GetMap(geotiff_path, bbox, width, height, crs, format=format)
+    return WMSBaseServiceHandle.GetMap(geotiff_path, bbox, width, height, crs, format=format)
+    # return WMSBaseServiceHandle2.GetMap(geotiff_path, bbox, width, height, crs, format=format)
 
 
 
